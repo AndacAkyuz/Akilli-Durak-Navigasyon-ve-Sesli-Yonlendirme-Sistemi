@@ -73,7 +73,7 @@ dependencies {
     implementation(libs.androidx.recyclerview)
     implementation ("com.google.android.gms:play-services-maps:18.2.0")
     implementation(libs.play.services.location)
-
+    implementation ("com.google.android.libraries.places:places:2.6.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -81,4 +81,8 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    implementation ("com.google.maps.android:android-maps-utils:2.3.0")
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.5.1")
+
+
 }
