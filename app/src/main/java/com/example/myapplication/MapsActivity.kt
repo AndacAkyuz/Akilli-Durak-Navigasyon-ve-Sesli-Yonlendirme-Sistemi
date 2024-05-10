@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -27,6 +29,7 @@ import com.google.android.libraries.places.api.net.PlacesClient
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.maps.android.PolyUtil
+import com.google.maps.android.SphericalUtil
 import kotlinx.coroutines.*
 import java.net.URL
 import org.json.JSONObject
@@ -41,6 +44,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var destinationInput: EditText
     private lateinit var routeDetails: TextView
+    private val averageStepLength = 0.75 // average step length in meters
 
     companion object {
         private const val REQUEST_LOCATION_PERMISSION = 1
@@ -76,6 +80,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     drawRoute(origin, destination, "transit")
                 }
             }
+        }
+
+        val startNavigationButton: Button = findViewById(R.id.startNavigationButton)
+        startNavigationButton.setOnClickListener {
+            startNavigation()
         }
     }
 
@@ -128,6 +137,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
     }
+
     private fun getDirectionsUrl(origin: LatLng, dest: LatLng, mode: String): String {
         val originStr = "origin=${origin.latitude},${origin.longitude}"
         val destStr = "destination=${dest.latitude},${dest.longitude}"
@@ -141,16 +151,19 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val routes = jsonObject.getJSONArray("routes")
         val legs = routes.getJSONObject(0).getJSONArray("legs")
         val steps = legs.getJSONObject(0).getJSONArray("steps")
+        routePolyline?.remove()  // Clear the previous route
+        val path = mutableListOf<LatLng>()
 
         for (i in 0 until steps.length()) {
             val step = steps.getJSONObject(i)
             val travelMode = step.getString("travel_mode")
             val polyline = step.getJSONObject("polyline").getString("points")
-            val path = PolyUtil.decode(polyline)
+            val segmentPath = PolyUtil.decode(polyline)
 
             if (travelMode == "WALKING") {
-                mMap.addPolyline(PolylineOptions().addAll(path).color(Color.BLUE).width(10f))
-                updateRouteDetails("Yürüyüş mesafesi", path.size)
+                mMap.addPolyline(PolylineOptions().addAll(segmentPath).color(Color.BLUE).width(10f))
+                // Add walking distance detail
+                updateRouteDetails("Yürüyerek ${segmentPath.size} adım sonra dön.")
             } else if (travelMode == "TRANSIT") {
                 val transitDetails = step.getJSONObject("transit_details")
                 val departureStop = transitDetails.getJSONObject("departure_stop").getString("name")
@@ -158,15 +171,57 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 val vehicleType = transitDetails.getJSONObject("line").getJSONObject("vehicle").getString("type")
                 val lineName = transitDetails.getJSONObject("line").getString("short_name")
 
-                mMap.addPolyline(PolylineOptions().addAll(path).color(Color.RED).width(10f))
-                updateRouteDetails("Otobüs: $lineName, $vehicleType, Duraklar: $departureStop - $arrivalStop", path.size)
+                mMap.addPolyline(PolylineOptions().addAll(segmentPath).color(Color.RED).width(10f))
+                // Include transit details in route information
+                updateRouteDetails("$departureStop'dan $arrivalStop'a $lineName $vehicleType ile gidin. $arrivalStop'ta inin.")
             }
+            path.addAll(segmentPath)
+        }
+        routePolyline = mMap.addPolyline(PolylineOptions().addAll(path).width(12f).color(Color.TRANSPARENT))
+    }
+    private fun updateRouteDetails(detail: String) {
+        routeDetails.append("\n$detail")
+    }
+
+    private fun startNavigation() {
+        if (routePolyline == null || routePolyline!!.points.isEmpty()) {
+            Toast.makeText(this, "Lütfen ilk önce rota oluşturun.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val path = routePolyline!!.points
+        navigatePath(path, 0)  // Start navigating from the first point
+    }
+
+    private fun navigatePath(path: List<LatLng>, index: Int) {
+        if (index < path.size - 1) {
+            val currentPoint = path[index]
+            val nextPoint = path[index + 1]
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentPoint, 15f))
+
+            val direction = calculateDirection(currentPoint, nextPoint)
+            val distance = SphericalUtil.computeDistanceBetween(currentPoint, nextPoint)
+            val stepsToNext = (distance / averageStepLength).toInt()  // averageStepLength is an estimated step length
+
+            Toast.makeText(this, "$stepsToNext adım sonra $direction dön.", Toast.LENGTH_LONG).show()
+
+            Handler(Looper.getMainLooper()).postDelayed({
+                navigatePath(path, index + 1)
+            }, 3000)  // Simulate time delay for each navigation step
+        } else {
+            Toast.makeText(this, "Navigasyon tamamlandı.", Toast.LENGTH_LONG).show()
         }
     }
 
-    private fun updateRouteDetails(detail: String, pathLength: Int) {
-        routeDetails.append("\n$detail, Mesafe: $pathLength Adım")
+    private fun calculateDirection(from: LatLng, to: LatLng): String {
+        val bearing = SphericalUtil.computeHeading(from, to)
+        return when {
+            bearing > -45 && bearing <= 45 -> "ileri" // Kuzey
+            bearing > 45 && bearing <= 135 -> "sola" // Batı
+            bearing > -135 && bearing <= -45 -> "sağa" // Doğu
+            else -> "geriye" // Güney
+        }
     }
+
 
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap

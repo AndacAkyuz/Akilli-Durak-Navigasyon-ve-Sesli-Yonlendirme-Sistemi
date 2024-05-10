@@ -16,14 +16,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/map"
-        android:hint="Enter destination" />
+        android:hint="Hedef Konumu Giriniz" />
 
     <Button
         android:id="@+id/destinationButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/destinationInput"
-        android:text="Search Location"
+        android:text="Lokasyon Ara"
         style="@style/CustomButtonStyle"/>
 
     <Button
@@ -31,15 +31,24 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/destinationButton"
-        android:text="Create Route"
+        android:text="Rota Oluştur"
         style="@style/CustomButtonStyle"/>
+
+    <Button
+        android:id="@+id/startNavigationButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Navigasyon Başlat"
+        android:layout_below="@id/createRouteButton"
+        style="@style/CustomButtonStyle"/>
+
 
     <TextView
         android:id="@+id/routeDetails"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@id/createRouteButton"
-        android:text="Route details appear here"
+        android:layout_below="@id/startNavigationButton"
+        android:text="Rota Detayları Burada Gözükür : "
         android:padding="16dp"/>
 
 </RelativeLayout>
