@@ -6,6 +6,8 @@ import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.tts.TextToSpeech
+import android.util.Log
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -33,6 +35,13 @@ import com.google.maps.android.SphericalUtil
 import kotlinx.coroutines.*
 import java.net.URL
 import org.json.JSONObject
+import java.util.Locale
+import android.content.Intent
+import android.provider.Settings
+import androidx.core.content.ContextCompat
+
+
+
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var mMap: GoogleMap
@@ -46,6 +55,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var routeDetails: TextView
     private val averageStepLength = 0.75 // average step length in meters
 
+    private lateinit var tts: TextToSpeech // text to speech google entregrasyon değişkeni
+
     companion object {
         private const val REQUEST_LOCATION_PERMISSION = 1
     }
@@ -53,6 +64,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_maps)
+
+        tts = TextToSpeech(this) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                val result = tts.setLanguage(Locale("tr", "TR"))
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    Log.e("TTS", "This Language is not supported")
+                }
+            } else {
+                Log.e("TTS", "Initialization Failed!")
+            }
+        }
 
         val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
@@ -200,17 +222,21 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
             val direction = calculateDirection(currentPoint, nextPoint)
             val distance = SphericalUtil.computeDistanceBetween(currentPoint, nextPoint)
-            val stepsToNext = (distance / averageStepLength).toInt()  // averageStepLength is an estimated step length
+            val stepsToNext = (distance / averageStepLength).toInt()
 
-            Toast.makeText(this, "$stepsToNext adım sonra $direction dön.", Toast.LENGTH_LONG).show()
+            val detailedDirection = "$stepsToNext adım sonra $direction yönüne gidin."
+            Toast.makeText(this, detailedDirection, Toast.LENGTH_LONG).show()
+            tts.speak(detailedDirection, TextToSpeech.QUEUE_ADD, null, null)  // Assuming 'tts' is your TextToSpeech instance
 
             Handler(Looper.getMainLooper()).postDelayed({
                 navigatePath(path, index + 1)
-            }, 3000)  // Simulate time delay for each navigation step
+            }, 1000)  // Simulate time delay for each navigation step
         } else {
             Toast.makeText(this, "Navigasyon tamamlandı.", Toast.LENGTH_LONG).show()
+            tts.speak("Navigasyon tamamlandı.", TextToSpeech.QUEUE_FLUSH, null, null)
         }
     }
+
 
     private fun calculateDirection(from: LatLng, to: LatLng): String {
         val bearing = SphericalUtil.computeHeading(from, to)
@@ -218,7 +244,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             bearing > -45 && bearing <= 45 -> "ileri" // Kuzey
             bearing > 45 && bearing <= 135 -> "sola" // Batı
             bearing > -135 && bearing <= -45 -> "sağa" // Doğu
-            else -> "geriye" // Güney
+            else -> "geri" // Güney
         }
     }
 
@@ -253,5 +279,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    override fun onDestroy() {  //Text to speech boş ise konuşmasın
+        if (tts != null) {
+            tts.stop()
+            tts.shutdown()
+        }
+        super.onDestroy()
     }
 }
