@@ -144,6 +144,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
 
+    private var isNavigating = false // Yeni flag, navigasyon durumunu takip eder
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
 
@@ -153,7 +155,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
             if (spokenText.isNotEmpty()) {
                 destinationInput.setText(spokenText)
-                searchAndNavigate(spokenText)  // Arama ve navigasyon işlemlerini başlat
+                // Navigasyon başlatılmadıysa ve konuşma sonucu varsa arama yap
+                if (!isNavigating) {
+                    searchAndNavigate(spokenText)  // Arama ve navigasyon işlemlerini başlat
+                }
             } else {
                 Toast.makeText(this, "Please speak clearly.", Toast.LENGTH_SHORT).show()
             }
@@ -161,6 +166,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun searchAndNavigate(address: String) {
+        if (isNavigating) return  // Eğer zaten navigasyon yapılıyorsa işlem yapma
+
         val request = FindAutocompletePredictionsRequest.builder()
             .setQuery(address)
             .build()
@@ -178,7 +185,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         searchMarker?.remove()
                         searchMarker = mMap.addMarker(MarkerOptions().position(it).title(address))
                         currentLocation?.let { origin ->
-                            drawRouteAndStartNavigation(origin, it) // Rota çizimi ve navigasyonu başlat
+                            if (!isNavigating) {
+                                drawRouteAndStartNavigation(origin, it) // Rota çizimi ve navigasyonu başlat
+                            }
                         }
                     }
                 }.addOnFailureListener { exception ->
@@ -191,13 +200,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun drawRouteAndStartNavigation(origin: LatLng, destination: LatLng) {
+        if (isNavigating) return  // Eğer zaten rota çiziliyorsa veya navigasyon başladıysa tekrar çizme ve başlatma
+
         val url = getDirectionsUrl(origin, destination, "transit")
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val result = URL(url).readText()
                 withContext(Dispatchers.Main) {
                     parseDirections(result)
-                    startNavigation() // Rota çizildikten sonra navigasyonu başlat
+                    if (!isNavigating) {
+                        startNavigation()
+                    }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -206,6 +219,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
     }
+
 
 
 
@@ -279,14 +293,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val output = "json"
         return "https://maps.googleapis.com/maps/api/directions/$output?$params&key=AIzaSyAej1Jp0p05Sjx8laIdIHUmKDnHWFMeZyE"
     }
-    private fun speakRouteDetails() {  // Oluşan rota hakkında bazı bilgiler
-        val details = routeDetails.text.toString()
-        if (details.isNotEmpty()) {
-            tts.speak(details, TextToSpeech.QUEUE_FLUSH, null, null)
-        } else {
-            Toast.makeText(this, "Rota detayı bulunamadı.", Toast.LENGTH_SHORT).show()
-        }
-    }
 
     private fun parseDirections(jsonData: String) {
         val jsonObject = JSONObject(jsonData)
@@ -321,10 +327,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             path.addAll(segmentPath)
         }
         routePolyline = mMap.addPolyline(PolylineOptions().addAll(path).width(12f).color(Color.TRANSPARENT))
-        // parseDirections fonksiyonunun en sonunda
-        tts.speak("Şu an oluşan güncel rota hakkında bazı bilgiler :", TextToSpeech.QUEUE_FLUSH, null, null)
-        speakRouteDetails()
-
     }
 
     private fun updateRouteDetails(detail: String) {  // parseDirections sınıfı için gerekli update route details fonksiyonu
@@ -338,12 +340,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun startNavigation() {
-        if (routePolyline == null || routePolyline!!.points.isEmpty()) {
+        if (routePolyline == null || routePolyline!!.points.isEmpty() || isNavigating) {
             Toast.makeText(this, "Lütfen ilk önce rota oluşturun.", Toast.LENGTH_SHORT).show()
             return
         }
+        isNavigating = true  // Navigasyon başladı olarak işaretle
         val path = routePolyline!!.points
-        tts.speak("Navigasyon başlıyor", TextToSpeech.QUEUE_FLUSH, null, null)
         navigatePath(path, 0)  // Start navigating from the first point
     }
 
@@ -379,6 +381,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
 
     fun stopNavigation(view: View?) {
+        isNavigating = false
+
         // Haritadaki tüm görsel unsurları temizle
         mMap.clear()
 
