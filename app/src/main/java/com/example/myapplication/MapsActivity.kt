@@ -1,11 +1,15 @@
 package com.example.myapplication
 
 import android.Manifest
+import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.widget.Button
@@ -36,9 +40,7 @@ import kotlinx.coroutines.*
 import java.net.URL
 import org.json.JSONObject
 import java.util.Locale
-import android.content.Intent
-import android.provider.Settings
-import androidx.core.content.ContextCompat
+
 
 
 
@@ -57,6 +59,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var tts: TextToSpeech // text to speech google entregrasyon değişkeni
 
+    private val RQ_SPEECH_REC= 102
+
     companion object {
         private const val REQUEST_LOCATION_PERMISSION = 1
     }
@@ -64,6 +68,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_maps)
+
+
+
+        var talkButton = findViewById<Button>(R.id.talkToPush)
+        talkButton.setOnClickListener {
+            askspeechinput()
+        }
+
+
 
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
@@ -109,6 +122,84 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             startNavigation()
         }
     }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == RQ_SPEECH_REC && resultCode == Activity.RESULT_OK && data != null) {
+            val result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            val spokenText = result?.get(0).toString()
+
+            if (spokenText.isNotEmpty()) {
+                destinationInput.setText(spokenText)
+                searchAndNavigate(spokenText)  // Arama ve navigasyon işlemlerini başlat
+            } else {
+                Toast.makeText(this, "Please speak clearly.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun searchAndNavigate(address: String) {
+        val request = FindAutocompletePredictionsRequest.builder()
+            .setQuery(address)
+            .build()
+
+        placesClient.findAutocompletePredictions(request).addOnSuccessListener { response ->
+            for (prediction in response.autocompletePredictions) {
+                val placeId = prediction.placeId
+                val placeFields = listOf(Place.Field.LAT_LNG)
+                val fetchPlaceRequest = FetchPlaceRequest.builder(placeId, placeFields).build()
+
+                placesClient.fetchPlace(fetchPlaceRequest).addOnSuccessListener { fetchPlaceResponse ->
+                    val place = fetchPlaceResponse.place
+                    place.latLng?.let {
+                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it, 15f))
+                        searchMarker?.remove()
+                        searchMarker = mMap.addMarker(MarkerOptions().position(it).title(address))
+                        currentLocation?.let { origin ->
+                            drawRouteAndStartNavigation(origin, it) // Rota çizimi ve navigasyonu başlat
+                        }
+                    }
+                }.addOnFailureListener { exception ->
+                    Toast.makeText(this, "Place not found: ${exception.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.addOnFailureListener { exception ->
+            Toast.makeText(this, "Error finding place: ${exception.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun drawRouteAndStartNavigation(origin: LatLng, destination: LatLng) {
+        val url = getDirectionsUrl(origin, destination, "transit")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val result = URL(url).readText()
+                withContext(Dispatchers.Main) {
+                    parseDirections(result)
+                    startNavigation() // Rota çizildikten sonra navigasyonu başlat
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MapsActivity, "Error in drawing route: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+
+
+    private fun askspeechinput() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            Toast.makeText(this, "Ses tanımlanamadı", Toast.LENGTH_SHORT).show()
+        } else {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR") // Türkçe dil ayarı
+            intent.putExtra(RecognizerIntent.EXTRA_PROMPT, "Konuşun")
+            startActivityForResult(intent, RQ_SPEECH_REC)
+        }
+    }
+
 
     private fun initializePlaces() {
         if (!Places.isInitialized()) {
@@ -184,7 +275,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
             if (travelMode == "WALKING") {
                 mMap.addPolyline(PolylineOptions().addAll(segmentPath).color(Color.BLUE).width(10f))
-                // Add walking distance detail
                 updateRouteDetails("Yürüyerek ${segmentPath.size} adım sonra dön.")
             } else if (travelMode == "TRANSIT") {
                 val transitDetails = step.getJSONObject("transit_details")
@@ -193,16 +283,25 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 val vehicleType = transitDetails.getJSONObject("line").getJSONObject("vehicle").getString("type")
                 val lineName = transitDetails.getJSONObject("line").getString("short_name")
 
+                // Otobüs ve durak bilgilerini güncelle
+                updateNavigationStatus(lineName, arrivalStop)
+
                 mMap.addPolyline(PolylineOptions().addAll(segmentPath).color(Color.RED).width(10f))
-                // Include transit details in route information
                 updateRouteDetails("$departureStop'dan $arrivalStop'a $lineName $vehicleType ile gidin. $arrivalStop'ta inin.")
             }
             path.addAll(segmentPath)
         }
         routePolyline = mMap.addPolyline(PolylineOptions().addAll(path).width(12f).color(Color.TRANSPARENT))
     }
-    private fun updateRouteDetails(detail: String) {
+
+    private fun updateRouteDetails(detail: String) {  // parseDirections sınıfı için gerekli update route details fonksiyonu
         routeDetails.append("\n$detail")
+    }
+    private var currentBusNumber: String = "" // updateNavigationStatus fonksiyonunun değişkeni 1
+    private var currentStop: String = "" // updateNavigationStatus fonksiyonunun değişkeni 2
+    private fun updateNavigationStatus(busNumber: String, stopName: String) { // navigatePath sınıfı için gerekli update navigasyon durumu fonksiyonu
+        currentBusNumber = busNumber
+        currentStop = stopName
     }
 
     private fun startNavigation() {
@@ -215,27 +314,41 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun navigatePath(path: List<LatLng>, index: Int) {
-        if (index < path.size - 1) {
+        if (index < path.size) {
             val currentPoint = path[index]
-            val nextPoint = path[index + 1]
-            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentPoint, 15f))
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentPoint, 17f))
 
-            val direction = calculateDirection(currentPoint, nextPoint)
-            val distance = SphericalUtil.computeDistanceBetween(currentPoint, nextPoint)
-            val stepsToNext = (distance / averageStepLength).toInt()
+            if (index < path.size - 1) {
+                val nextPoint = path[index + 1]
+                val direction = calculateDirection(currentPoint, nextPoint)
+                val distance = SphericalUtil.computeDistanceBetween(currentPoint, nextPoint)
+                val stepsToNext = (distance / averageStepLength).toInt()
+                val detailedDirection = "$stepsToNext adım sonra $direction yönüne gidin."
+                Toast.makeText(this, detailedDirection, Toast.LENGTH_LONG).show()
+                tts.speak(detailedDirection, TextToSpeech.QUEUE_ADD, null, null)
+            }
 
-            val detailedDirection = "$stepsToNext adım sonra $direction yönüne gidin."
-            Toast.makeText(this, detailedDirection, Toast.LENGTH_LONG).show()
-            tts.speak(detailedDirection, TextToSpeech.QUEUE_ADD, null, null)  // Assuming 'tts' is your TextToSpeech instance
+            // Periyodik uyarılar için kod
+            val periodicAnnouncement = Runnable {
+                if (currentBusNumber.isNotEmpty() && currentStop.isNotEmpty()) {
+                    val routeInfo = "Şu anda $currentBusNumber numaralı otobüste, $currentStop'a doğru ilerliyorsunuz."
+                    tts.speak(routeInfo, TextToSpeech.QUEUE_ADD, null, null)
+                }
+            }
+            val handler = Handler(Looper.getMainLooper())
+            handler.postDelayed(periodicAnnouncement, 200000)  // Her 200 saniyede bir tekrarla
 
-            Handler(Looper.getMainLooper()).postDelayed({
-                navigatePath(path, index + 1)
-            }, 1000)  // Simulate time delay for each navigation step
-        } else {
-            Toast.makeText(this, "Navigasyon tamamlandı.", Toast.LENGTH_LONG).show()
-            tts.speak("Navigasyon tamamlandı.", TextToSpeech.QUEUE_FLUSH, null, null)
+            if (index < path.size - 1) {
+                handler.postDelayed({
+                    navigatePath(path, index + 1)
+                }, 3000)  // Her adım için zaman gecikmesi simüle ediliyor
+            } else {
+                Toast.makeText(this, "Navigasyon tamamlandı.", Toast.LENGTH_LONG).show()
+                tts.speak("Navigasyon tamamlandı.", TextToSpeech.QUEUE_FLUSH, null, null)
+            }
         }
     }
+
 
 
     private fun calculateDirection(from: LatLng, to: LatLng): String {
@@ -253,6 +366,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mMap = googleMap
         mMap.uiSettings.isZoomControlsEnabled = true
         enableMyLocation()
+        //mMap.isTrafficEnabled = true  //Trafik gösterimi
+
+        mMap.mapType = GoogleMap.MAP_TYPE_HYBRID // Harita modunun hibrit olması yani binaların ve caddelerin gösterilmesi
+
     }
 
     private fun enableMyLocation() {
@@ -265,7 +382,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
             if (location != null) {
                 currentLocation = LatLng(location.latitude, location.longitude)
-                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLocation!!, 15f))
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(currentLocation!!, 16f))
             }
         }
     }
@@ -288,4 +405,5 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
         super.onDestroy()
     }
+
 }
