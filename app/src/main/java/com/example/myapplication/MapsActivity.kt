@@ -144,7 +144,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
 
-    private var isNavigating = false // Yeni flag, navigasyon durumunu takip eder
+    // Yeni flag, navigasyon durumunu takip eder
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -155,9 +155,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
             if (spokenText.isNotEmpty()) {
                 destinationInput.setText(spokenText)
-                // Navigasyon başlatılmadıysa ve konuşma sonucu varsa arama yap
                 if (!isNavigating) {
-                    searchAndNavigate(spokenText)  // Arama ve navigasyon işlemlerini başlat
+                    searchAndNavigate(spokenText)
                 }
             } else {
                 Toast.makeText(this, "Please speak clearly.", Toast.LENGTH_SHORT).show()
@@ -165,8 +164,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
+    private var isNavigating = false
+    private var isRouteDrawn = false
+
     private fun searchAndNavigate(address: String) {
-        if (isNavigating) return  // Eğer zaten navigasyon yapılıyorsa işlem yapma
+        if (isNavigating || isRouteDrawn) return
 
         val request = FindAutocompletePredictionsRequest.builder()
             .setQuery(address)
@@ -181,26 +183,21 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 placesClient.fetchPlace(fetchPlaceRequest).addOnSuccessListener { fetchPlaceResponse ->
                     val place = fetchPlaceResponse.place
                     place.latLng?.let {
-                        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(it, 15f))
                         searchMarker?.remove()
                         searchMarker = mMap.addMarker(MarkerOptions().position(it).title(address))
                         currentLocation?.let { origin ->
-                            if (!isNavigating) {
-                                drawRouteAndStartNavigation(origin, it) // Rota çizimi ve navigasyonu başlat
+                            if (!isRouteDrawn) {
+                                drawRouteAndStartNavigation(origin, it)
                             }
                         }
                     }
-                }.addOnFailureListener { exception ->
-                    Toast.makeText(this, "Place not found: ${exception.message}", Toast.LENGTH_LONG).show()
                 }
             }
-        }.addOnFailureListener { exception ->
-            Toast.makeText(this, "Error finding place: ${exception.message}", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun drawRouteAndStartNavigation(origin: LatLng, destination: LatLng) {
-        if (isNavigating) return  // Eğer zaten rota çiziliyorsa veya navigasyon başladıysa tekrar çizme ve başlatma
+        if (isNavigating) return
 
         val url = getDirectionsUrl(origin, destination, "transit")
         CoroutineScope(Dispatchers.IO).launch {
@@ -210,6 +207,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     parseDirections(result)
                     if (!isNavigating) {
                         startNavigation()
+                        isRouteDrawn = true
                     }
                 }
             } catch (e: Exception) {
@@ -219,6 +217,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
     }
+
 
 
 
@@ -344,10 +343,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             Toast.makeText(this, "Lütfen ilk önce rota oluşturun.", Toast.LENGTH_SHORT).show()
             return
         }
-        isNavigating = true  // Navigasyon başladı olarak işaretle
-        val path = routePolyline!!.points
-        navigatePath(path, 0)  // Start navigating from the first point
+        isNavigating = true
+        navigatePath(routePolyline!!.points, 0)
     }
+
 
     private var navigationHandler: Handler? = null // Global Handler reference for navigation
 
