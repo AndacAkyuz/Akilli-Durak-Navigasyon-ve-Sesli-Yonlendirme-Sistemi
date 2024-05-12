@@ -12,6 +12,8 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.util.Log
+import android.view.KeyEvent
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -83,6 +85,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 val result = tts.setLanguage(Locale("tr", "TR"))
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     Log.e("TTS", "This Language is not supported")
+                }else {
+                    tts.speak("Merhaba navigasyon uygulamamıza hoşgeldiniz. Uygulamayı kullanmak için cihazınızın ses açma tuşuna bastıktan sonra mikrofona gitmek istediğiniz yeri söylemeniz yeterlidir. Olası bir iptal veya durdurma için de ses kısma tuşuna basabilirsiniz. Keyifli ulaşımlar dileriz", TextToSpeech.QUEUE_FLUSH, null, null)
                 }
             } else {
                 Log.e("TTS", "Initialization Failed!")
@@ -122,6 +126,23 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             startNavigation()
         }
     }
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // Ses açma tuşuna basıldığında
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
+            // talkToPush butonunu çalıştır
+            val talkButton = findViewById<Button>(R.id.talkToPush)
+            talkButton.performClick()
+            return true
+        }
+        // Ses kısma tuşuna basıldığında
+        else if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            stopNavigation(null)
+            return true
+        }
+        // Diğer tuşlar için varsayılan işlevi gerçekleştir
+        return super.onKeyDown(keyCode, event)
+    }
+
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -258,6 +279,14 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val output = "json"
         return "https://maps.googleapis.com/maps/api/directions/$output?$params&key=AIzaSyAej1Jp0p05Sjx8laIdIHUmKDnHWFMeZyE"
     }
+    private fun speakRouteDetails() {  // Oluşan rota hakkında bazı bilgiler
+        val details = routeDetails.text.toString()
+        if (details.isNotEmpty()) {
+            tts.speak(details, TextToSpeech.QUEUE_FLUSH, null, null)
+        } else {
+            Toast.makeText(this, "Rota detayı bulunamadı.", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     private fun parseDirections(jsonData: String) {
         val jsonObject = JSONObject(jsonData)
@@ -292,6 +321,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             path.addAll(segmentPath)
         }
         routePolyline = mMap.addPolyline(PolylineOptions().addAll(path).width(12f).color(Color.TRANSPARENT))
+        // parseDirections fonksiyonunun en sonunda
+        tts.speak("Şu an oluşan güncel rota hakkında bazı bilgiler :", TextToSpeech.QUEUE_FLUSH, null, null)
+        speakRouteDetails()
+
     }
 
     private fun updateRouteDetails(detail: String) {  // parseDirections sınıfı için gerekli update route details fonksiyonu
@@ -310,10 +343,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             return
         }
         val path = routePolyline!!.points
+        tts.speak("Navigasyon başlıyor", TextToSpeech.QUEUE_FLUSH, null, null)
         navigatePath(path, 0)  // Start navigating from the first point
     }
 
+    private var navigationHandler: Handler? = null // Global Handler reference for navigation
+
     private fun navigatePath(path: List<LatLng>, index: Int) {
+        navigationHandler = Handler(Looper.getMainLooper())
+
         if (index < path.size) {
             val currentPoint = path[index]
             mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentPoint, 17f))
@@ -328,25 +366,33 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 tts.speak(detailedDirection, TextToSpeech.QUEUE_ADD, null, null)
             }
 
-            // Periyodik uyarılar için kod
-            val periodicAnnouncement = Runnable {
-                if (currentBusNumber.isNotEmpty() && currentStop.isNotEmpty()) {
-                    val routeInfo = "Şu anda $currentBusNumber numaralı otobüste, $currentStop'a doğru ilerliyorsunuz."
-                    tts.speak(routeInfo, TextToSpeech.QUEUE_ADD, null, null)
-                }
-            }
-            val handler = Handler(Looper.getMainLooper())
-            handler.postDelayed(periodicAnnouncement, 200000)  // Her 200 saniyede bir tekrarla
-
-            if (index < path.size - 1) {
-                handler.postDelayed({
-                    navigatePath(path, index + 1)
-                }, 3000)  // Her adım için zaman gecikmesi simüle ediliyor
-            } else {
-                Toast.makeText(this, "Navigasyon tamamlandı.", Toast.LENGTH_LONG).show()
-                tts.speak("Navigasyon tamamlandı.", TextToSpeech.QUEUE_FLUSH, null, null)
-            }
+            // Schedule the next update
+            navigationHandler?.postDelayed({
+                navigatePath(path, index + 1) // Recursive call to move to the next point
+            }, 5000) // Adjust the delay time as needed for your app context
+        } else {
+            // Navigation has reached the end
+            Toast.makeText(this, "Navigasyon tamamlandı.", Toast.LENGTH_LONG).show()
+            tts.speak("Navigasyon tamamlandı.", TextToSpeech.QUEUE_FLUSH, null, null)
         }
+    }
+
+
+    fun stopNavigation(view: View?) {
+        // Haritadaki tüm görsel unsurları temizle
+        mMap.clear()
+
+        // Global Handler ve TTS işlemlerini durdur
+        navigationHandler?.removeCallbacksAndMessages(null)
+        navigationHandler = null
+        tts.stop()
+
+        // UI detaylarını sıfırla
+        routeDetails.text = ""
+        destinationInput.setText("")
+
+        Toast.makeText(this, "Navigasyon durduruldu ve sıfırlandı.", Toast.LENGTH_SHORT).show()
+        tts.speak("Navigasyon durduruldu ve sıfırlandı.", TextToSpeech.QUEUE_FLUSH, null, null)
     }
 
 
