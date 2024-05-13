@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">My Application</string>
-    <string name="title_activity_maps">MapsActivity</string>
+    <string name="app_name">FOA Navigasyon</string>
+    <string name="title_activity_maps">FOA Navigasyon</string>
 </resources>
