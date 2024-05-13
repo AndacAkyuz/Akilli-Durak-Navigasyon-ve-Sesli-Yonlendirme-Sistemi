@@ -203,9 +203,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         searchMarker?.remove()
                         searchMarker = mMap.addMarker(MarkerOptions().position(it).title(address))
                         currentLocation?.let { origin ->
-                            if (!isRouteDrawn) {
-                                drawRouteAndStartNavigation(origin, it)
-                            }
+                            drawRouteAndStartNavigation(origin, it)
                         }
                     }
                 }
@@ -282,12 +280,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun drawRoute(origin: LatLng, dest: LatLng, mode: String) {
+        if (isRouteDrawn) return
+
         val url = getDirectionsUrl(origin, dest, mode)
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val result = URL(url).readText()
                 withContext(Dispatchers.Main) {
                     parseDirections(result)
+                    isRouteDrawn = true
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -305,7 +306,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         return "https://maps.googleapis.com/maps/api/directions/$output?$params&key=AIzaSyAej1Jp0p05Sjx8laIdIHUmKDnHWFMeZyE"
     }
 
-    private fun parseDirections(jsonData: String) { //temel rotayı oluşturan kod (rota oluştur butonuna basıldığında aşağıda çıkan)
+    private fun parseDirections(jsonData: String) {
         val jsonObject = JSONObject(jsonData)
         val routes = jsonObject.getJSONArray("routes")
         val legs = routes.getJSONObject(0).getJSONArray("legs")
@@ -383,7 +384,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             // Schedule the next update
             navigationHandler?.postDelayed({
                 navigatePath(path, index + 1) // Recursive call to move to the next point
-            }, 5000) // Adjust the delay time as needed for your app context
+            }, 8000) // Adjust the delay time as needed for your app context
         } else {
             // Navigation has reached the end
             Toast.makeText(this, "Navigasyon tamamlandı.", Toast.LENGTH_LONG).show()
