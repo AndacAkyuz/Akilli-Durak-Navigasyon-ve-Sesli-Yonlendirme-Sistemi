@@ -364,33 +364,33 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private var navigationHandler: Handler? = null // Global Handler reference for navigation  , Stop işlemi için gerekli
 
-    private fun navigatePath(path: List<LatLng>, index: Int) { // Navigasyon oluşturma ve başlatma fonksiyonu
-        navigationHandler = Handler(Looper.getMainLooper())
-
-        if (index < path.size) {
-            val currentPoint = path[index]
-            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentPoint, 17f))
-
-            if (index < path.size - 1) {
-                val nextPoint = path[index + 1]
-                val direction = calculateDirection(currentPoint, nextPoint)
-                val distance = SphericalUtil.computeDistanceBetween(currentPoint, nextPoint)
-                val stepsToNext = (distance / averageStepLength).toInt()
-                val detailedDirection = "$stepsToNext adım sonra $direction yönüne gidin."
-                Toast.makeText(this, detailedDirection, Toast.LENGTH_LONG).show()
-                tts.speak(detailedDirection, TextToSpeech.QUEUE_ADD, null, null)
-            }
-
-            // Schedule the next update
-            navigationHandler?.postDelayed({
-                navigatePath(path, index + 1) // Recursive call to move to the next point
-            }, 8000) // Adjust the delay time as needed for your app context
-        } else {
-            // Navigation has reached the end
-            Toast.makeText(this, "Navigasyon tamamlandı.", Toast.LENGTH_LONG).show()
-            tts.speak("Navigasyon tamamlandı.", TextToSpeech.QUEUE_FLUSH, null, null)
-        }
-    }
+//    private fun navigatePath(path: List<LatLng>, index: Int) { // Navigasyon oluşturma ve başlatma ESKİ FONKSİYON ARTIK KULLANILMIYOR
+//        navigationHandler = Handler(Looper.getMainLooper())
+//
+//        if (index < path.size) {
+//            val currentPoint = path[index]
+//            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentPoint, 17f))
+//
+//            if (index < path.size - 1) {
+//                val nextPoint = path[index + 1]
+//                val direction = calculateDirection(currentPoint, nextPoint)
+//                val distance = SphericalUtil.computeDistanceBetween(currentPoint, nextPoint)
+//                val stepsToNext = (distance / averageStepLength).toInt()
+//                val detailedDirection = "$stepsToNext adım sonra $direction yönüne gidin."
+//                Toast.makeText(this, detailedDirection, Toast.LENGTH_LONG).show()
+//                tts.speak(detailedDirection, TextToSpeech.QUEUE_ADD, null, null)
+//            }
+//
+//            // Schedule the next update
+//            navigationHandler?.postDelayed({
+//                navigatePath(path, index + 1) // Recursive call to move to the next point
+//            }, 8000) // Adjust the delay time as needed for your app context
+//        } else {
+//            // Navigation has reached the end
+//            Toast.makeText(this, "Navigasyon tamamlandı.", Toast.LENGTH_LONG).show()
+//            tts.speak("Navigasyon tamamlandı.", TextToSpeech.QUEUE_FLUSH, null, null)
+//        }
+//    }
 
     fun stopNavigation(view: View?) {
         isNavigating = false
