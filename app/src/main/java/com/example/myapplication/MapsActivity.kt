@@ -2,9 +2,12 @@ package com.example.myapplication
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.location.Location
+import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -20,6 +23,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import com.google.android.gms.location.*
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -34,33 +38,26 @@ import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.FetchPlaceRequest
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
 import com.google.android.libraries.places.api.net.PlacesClient
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
 import com.google.maps.android.PolyUtil
 import com.google.maps.android.SphericalUtil
 import kotlinx.coroutines.*
-import java.net.URL
 import org.json.JSONObject
+import java.net.URL
 import java.util.Locale
-import android.content.Context
-import android.media.AudioManager
-
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var mMap: GoogleMap
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private lateinit var locationCallback: LocationCallback
     private lateinit var placesClient: PlacesClient
     private var currentLocation: LatLng? = null
     private var searchMarker: Marker? = null
     private var routePolyline: Polyline? = null
-
     private lateinit var destinationInput: EditText
     private lateinit var routeDetails: TextView
-    private val averageStepLength = 0.75 // average step length in meters
-
-    private lateinit var tts: TextToSpeech // text to speech google entregrasyon değişkeni
-
-    private val RQ_SPEECH_REC= 102
+    private val averageStepLength = 0.75 // ortalama metre cinsinden adım uzunluğu
+    private lateinit var tts: TextToSpeech // text to speech google entegrasyon değişkeni
+    private val RQ_SPEECH_REC = 102
 
     companion object {
         private const val REQUEST_LOCATION_PERMISSION = 1
@@ -69,23 +66,25 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_maps)
-
         maximizeVolume() // Uygulamaya girdiğinde ses seviyesini fulleyen kod
 
-        var talkButton = findViewById<Button>(R.id.talkToPush)
+        val talkButton = findViewById<Button>(R.id.talkToPush)
         talkButton.setOnClickListener {
             askspeechinput()
         }
-
-
 
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 val result = tts.setLanguage(Locale("tr", "TR"))
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     Log.e("TTS", "This Language is not supported")
-                }else {
-                    tts.speak("Merhaba navigasyon uygulamamıza hoşgeldiniz. Uygulamayı kullanmak için cihazınızın ses açma tuşuna bastıktan sonra mikrofona gitmek istediğiniz yeri söylemeniz yeterlidir. Olası bir iptal veya durdurma için de ses kısma tuşuna basabilirsiniz. Keyifli ulaşımlar dileriz", TextToSpeech.QUEUE_FLUSH, null, null)
+                } else {
+                    tts.speak(
+                        "Merhaba navigasyon uygulamamıza hoşgeldiniz. Uygulamayı kullanmak için cihazınızın ses açma tuşuna bastıktan sonra mikrofona gitmek istediğiniz yeri söylemeniz yeterlidir. Olası bir iptal veya durdurma için de ses kısma tuşuna basabilirsiniz. Keyifli ulaşımlar dileriz",
+                        TextToSpeech.QUEUE_FLUSH,
+                        null,
+                        null
+                    )
                 }
             } else {
                 Log.e("TTS", "Initialization Failed!")
@@ -124,6 +123,18 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         startNavigationButton.setOnClickListener {
             startNavigation()
         }
+
+        // Initialize location callback
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(locationResult: LocationResult) {
+                for (location in locationResult.locations) {
+                    currentLocation = LatLng(location.latitude, location.longitude)
+                    if (isNavigating) {
+                        updateNavigation(location)
+                    }
+                }
+            }
+        }
     }
 
     private fun maximizeVolume() { //Ses fulleyen kod
@@ -134,7 +145,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0)
     }
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean { // Ses açma kısma tuşlarına işlev atayan fonksiyon
         // Ses açma tuşuna basıldığında
         if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) {
             // talkToPush butonunu çalıştır
@@ -150,9 +162,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         // Diğer tuşlar için varsayılan işlevi gerçekleştir
         return super.onKeyDown(keyCode, event)
     }
-
-
-    // Yeni flag, navigasyon durumunu takip eder
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -226,10 +235,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-
-
-
-
     private fun askspeechinput() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             Toast.makeText(this, "Ses tanımlanamadı", Toast.LENGTH_SHORT).show()
@@ -241,7 +246,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             startActivityForResult(intent, RQ_SPEECH_REC)
         }
     }
-
 
     private fun initializePlaces() {
         if (!Places.isInitialized()) {
@@ -301,7 +305,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         return "https://maps.googleapis.com/maps/api/directions/$output?$params&key=AIzaSyAej1Jp0p05Sjx8laIdIHUmKDnHWFMeZyE"
     }
 
-    private fun parseDirections(jsonData: String) {
+    private fun parseDirections(jsonData: String) { //temel rotayı oluşturan kod (rota oluştur butonuna basıldığında aşağıda çıkan)
         val jsonObject = JSONObject(jsonData)
         val routes = jsonObject.getJSONArray("routes")
         val legs = routes.getJSONObject(0).getJSONArray("legs")
@@ -339,8 +343,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun updateRouteDetails(detail: String) {  // parseDirections sınıfı için gerekli update route details fonksiyonu
         routeDetails.append("\n$detail")
     }
+
     private var currentBusNumber: String = "" // updateNavigationStatus fonksiyonunun değişkeni 1
     private var currentStop: String = "" // updateNavigationStatus fonksiyonunun değişkeni 2
+
     private fun updateNavigationStatus(busNumber: String, stopName: String) { // navigatePath sınıfı için gerekli update navigasyon durumu fonksiyonu
         currentBusNumber = busNumber
         currentStop = stopName
@@ -352,13 +358,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             return
         }
         isNavigating = true
-        navigatePath(routePolyline!!.points, 0)
+        startLocationUpdates() // Start real-time location updates
     }
 
+    private var navigationHandler: Handler? = null // Global Handler reference for navigation  , Stop işlemi için gerekli
 
-    private var navigationHandler: Handler? = null // Global Handler reference for navigation
-
-    private fun navigatePath(path: List<LatLng>, index: Int) {
+    private fun navigatePath(path: List<LatLng>, index: Int) { // Navigasyon oluşturma ve başlatma fonksiyonu
         navigationHandler = Handler(Looper.getMainLooper())
 
         if (index < path.size) {
@@ -386,7 +391,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-
     fun stopNavigation(view: View?) {
         isNavigating = false
 
@@ -402,11 +406,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         routeDetails.text = ""
         destinationInput.setText("")
 
+        stopLocationUpdates() // Stop real-time location updates
+
         Toast.makeText(this, "Navigasyon durduruldu ve sıfırlandı.", Toast.LENGTH_SHORT).show()
         tts.speak("Navigasyon durduruldu ve sıfırlandı.", TextToSpeech.QUEUE_FLUSH, null, null)
     }
-
-
 
     private fun calculateDirection(from: LatLng, to: LatLng): String {
         val bearing = SphericalUtil.computeHeading(from, to)
@@ -418,15 +422,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
         mMap.uiSettings.isZoomControlsEnabled = true
         enableMyLocation()
         //mMap.isTrafficEnabled = true  //Trafik gösterimi
-
         mMap.mapType = GoogleMap.MAP_TYPE_HYBRID // Harita modunun hibrit olması yani binaların ve caddelerin gösterilmesi
-
     }
 
     private fun enableMyLocation() {
@@ -455,6 +456,56 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
+    private fun startLocationUpdates() {
+        val locationRequest = LocationRequest.create().apply {
+            interval = 5000
+            fastestInterval = 2000
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        }
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+        }
+    }
+
+    private fun stopLocationUpdates() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+    }
+
+    private fun updateNavigation(location: Location) {
+        currentLocation = LatLng(location.latitude, location.longitude)
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLocation!!, 17f))
+
+        routePolyline?.let { polyline ->
+            if (polyline.points.isNotEmpty()) {
+                val closestPointIndex = getClosestPointIndex(currentLocation!!, polyline.points)
+                if (closestPointIndex < polyline.points.size - 1) {
+                    val nextPoint = polyline.points[closestPointIndex + 1]
+                    val direction = calculateDirection(currentLocation!!, nextPoint)
+                    val distance = SphericalUtil.computeDistanceBetween(currentLocation!!, nextPoint)
+                    val stepsToNext = (distance / averageStepLength).toInt()
+                    val detailedDirection = "$stepsToNext adım sonra $direction yönüne gidin."
+                    Toast.makeText(this, detailedDirection, Toast.LENGTH_LONG).show()
+                    tts.speak(detailedDirection, TextToSpeech.QUEUE_ADD, null, null)
+                }
+            }
+        }
+    }
+
+    private fun getClosestPointIndex(currentLocation: LatLng, path: List<LatLng>): Int {
+        var closestPointIndex = 0
+        var closestDistance = Double.MAX_VALUE
+
+        for (i in path.indices) {
+            val distance = SphericalUtil.computeDistanceBetween(currentLocation, path[i])
+            if (distance < closestDistance) {
+                closestDistance = distance
+                closestPointIndex = i
+            }
+        }
+
+        return closestPointIndex
+    }
+
     override fun onDestroy() {  //Text to speech boş ise konuşmasın
         if (tts != null) {
             tts.stop()
@@ -462,5 +513,4 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
         super.onDestroy()
     }
-
 }
