@@ -46,6 +46,13 @@ Bu proje, görme engelli bireyler için bağımsız hareket etmelerini kolaylaş
     - Sesli komutlar ile varış noktasını belirtin.
     - Ses kısma tuşuna basarak navigasyonu durdurun.
 
+## Uygulama İçerisinden Görseller
+    ![Ekran görüntüsü 2024-05-14 013825](https://github.com/AndacAkyuz/Akilli-Durak-Navigasyon-ve-Sesli-Yonlendirme-Sistemi/assets/91327557/135649e8-f184-4412-a59a-d6214c943207)
+![1](https://github.com/AndacAkyuz/Akilli-Durak-Navigasyon-ve-Sesli-Yonlendirme-Sistemi/assets/91327557/135649e8-f184-4412-a59a-d6214c943207)
+![Ekran görüntüsü 2024-05-14 014022](https://github.com/AndacAkyuz/Akilli-Durak-Navigasyon-ve-Sesli-Yonlendirme-Sistemi/assets/91327557/5ca010bc-1732-4e98-88e6-ed36c05ee72b)
+![2](https://github.com/AndacAkyuz/Akilli-Durak-Navigasyon-ve-Sesli-Yonlendirme-Sistemi/assets/91327557/5ca010bc-1732-4e98-88e6-ed36c05ee72b)
+
+
 ## Katkıda Bulunma
 
 1. Bu depoyu fork'layın (üst sağdaki Fork düğmesine tıklayın)
