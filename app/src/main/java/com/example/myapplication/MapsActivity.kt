@@ -42,9 +42,8 @@ import kotlinx.coroutines.*
 import java.net.URL
 import org.json.JSONObject
 import java.util.Locale
-
-
-
+import android.content.Context
+import android.media.AudioManager
 
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
@@ -71,7 +70,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_maps)
 
-
+        maximizeVolume() // Uygulamaya girdiğinde ses seviyesini fulleyen kod
 
         var talkButton = findViewById<Button>(R.id.talkToPush)
         talkButton.setOnClickListener {
@@ -125,6 +124,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         startNavigationButton.setOnClickListener {
             startNavigation()
         }
+    }
+
+    private fun maximizeVolume() { //Ses fulleyen kod
+        // AudioManager'ı al
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        // Medya ses seviyesini maksimuma çıkar
+        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, maxVolume, 0)
     }
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // Ses açma tuşuna basıldığında
