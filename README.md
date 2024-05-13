@@ -48,7 +48,6 @@ Bu proje, görme engelli bireyler için bağımsız hareket etmelerini kolaylaş
 
 ## Uygulama İçerisinden Görseller
 ![1](https://github.com/AndacAkyuz/Akilli-Durak-Navigasyon-ve-Sesli-Yonlendirme-Sistemi/assets/91327557/135649e8-f184-4412-a59a-d6214c943207)
-
 ![2](https://github.com/AndacAkyuz/Akilli-Durak-Navigasyon-ve-Sesli-Yonlendirme-Sistemi/assets/91327557/5ca010bc-1732-4e98-88e6-ed36c05ee72b)
 
 
