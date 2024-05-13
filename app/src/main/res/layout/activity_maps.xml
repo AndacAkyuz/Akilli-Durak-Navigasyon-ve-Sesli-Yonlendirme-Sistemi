@@ -49,7 +49,7 @@
         android:layout_below="@id/talkToPush"
         android:layout_marginTop="16dp"
         android:padding="16dp"
-        android:text="Oluşturduğum genel rota hakkında bazı bilgiler, navigasyon adımında bu hedeflere adım adım yönlendirileceksiniz." />
+        android:text="Oluşturduğum genel rota hakkında bazı bilgiler : " />
 
     <Button
         android:id="@+id/talkToPush"
