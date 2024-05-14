@@ -3,20 +3,58 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#000000"
     tools:context=".MapsActivity">
 
+    <!-- Harita fragmenti -->
     <fragment
         android:id="@+id/map"
         android:name="com.google.android.gms.maps.SupportMapFragment"
         android:layout_width="match_parent"
         android:layout_height="300dp" />
 
+    <!-- Mikrofon butonu (Görme engelli kullanıcılar için) -->
+    <Button
+        android:id="@+id/microphoneButton"
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_below="@id/map"
+        android:layout_centerHorizontal="true"
+        android:background="@drawable/microphone_icon"
+        android:contentDescription="Mikrofon"
+        android:layout_marginTop="55dp"
+        android:padding="20dp"
+        android:scaleType="centerInside" />
+
+
+    <!-- Görme Engelim Yok butonu -->
+    <Button
+        android:id="@+id/showAllButtons"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:text="Görme Engelim Yok"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/rounded_button"
+        android:padding="12dp"
+        android:layout_marginBottom="16dp"
+        android:textSize="16sp"
+        android:onClick="showAllButtons" />
+
+    <!-- Diğer butonlar (başlangıçta görünmez) -->
     <EditText
         android:id="@+id/destinationInput"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/map"
-        android:hint="Hedef Konumu Giriniz" />
+        android:hint="Hedef Konumu Giriniz"
+        android:visibility="gone"
+        android:background="@drawable/edittext_background"
+        android:textColor="#FFFFFF"
+        android:textColorHint="#B0B0B0"
+        android:padding="10dp"
+        android:layout_marginTop="8dp" />
 
     <Button
         android:id="@+id/destinationButton"
@@ -24,7 +62,11 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/destinationInput"
         android:text="Lokasyon Ara"
-        style="@style/CustomButtonStyle"/>
+        android:visibility="gone"
+        android:background="@drawable/rounded_button"
+        android:textColor="#FFFFFF"
+        android:padding="12dp"
+        android:layout_marginTop="8dp" />
 
     <Button
         android:id="@+id/createRouteButton"
@@ -32,15 +74,23 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/destinationButton"
         android:text="Rota Oluştur"
-        style="@style/CustomButtonStyle"/>
+        android:visibility="gone"
+        android:background="@drawable/rounded_button"
+        android:textColor="#FFFFFF"
+        android:padding="12dp"
+        android:layout_marginTop="8dp" />
 
     <Button
         android:id="@+id/startNavigationButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Navigasyon Başlat"
         android:layout_below="@id/createRouteButton"
-        style="@style/CustomButtonStyle"/>
+        android:text="Navigasyon Başlat"
+        android:visibility="gone"
+        android:background="@drawable/rounded_button"
+        android:textColor="#FFFFFF"
+        android:padding="12dp"
+        android:layout_marginTop="8dp" />
 
     <TextView
         android:id="@+id/routeDetails"
@@ -49,16 +99,21 @@
         android:layout_below="@id/talkToPush"
         android:layout_marginTop="16dp"
         android:padding="16dp"
-        android:text="Oluşturduğum genel rota hakkında bazı bilgiler : " />
+        android:text="Oluşturduğum genel rota hakkında bazı bilgiler : "
+        android:visibility="gone"
+        android:textColor="#FFFFFF" />
 
     <Button
         android:id="@+id/talkToPush"
-        style="@style/CustomButtonStyle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/startNavigationButton"
-        android:layout_marginTop="77dp"
-        android:text="Mikrofon" />
+        android:layout_below="@id/startNavigationButton"
+        android:layout_marginTop="16dp"
+        android:text="Mikrofon"
+        android:visibility="gone"
+        android:background="@drawable/rounded_button"
+        android:textColor="#FFFFFF"
+        android:padding="12dp" />
 
     <Button
         android:id="@+id/stopNavigationButton"
@@ -66,7 +121,10 @@
         android:layout_height="wrap_content"
         android:text="Navigasyonu Durdur"
         android:layout_marginTop="10dp"
-        android:onClick="stopNavigation"/>
-
+        android:visibility="gone"
+        android:background="@drawable/rounded_button"
+        android:textColor="#FFFFFF"
+        android:padding="12dp"
+        android:onClick="stopNavigation" />
 
 </RelativeLayout>

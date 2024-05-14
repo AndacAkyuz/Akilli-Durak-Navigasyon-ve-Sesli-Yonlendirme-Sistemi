@@ -69,7 +69,18 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         maximizeVolume() // Uygulamaya girdiğinde ses seviyesini fulleyen kod
 
         val talkButton = findViewById<Button>(R.id.talkToPush)
+        val microphoneButton = findViewById<Button>(R.id.microphoneButton)
+        val showAllButtons = findViewById<Button>(R.id.showAllButtons)
+
         talkButton.setOnClickListener {
+            askspeechinput()
+        }
+
+        showAllButtons.setOnClickListener {
+            showAllButtons()
+        }
+
+        microphoneButton.setOnClickListener {
             askspeechinput()
         }
 
@@ -137,6 +148,29 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
+    private fun showAllButtons() {
+        val microphoneButton = findViewById<Button>(R.id.microphoneButton)
+        microphoneButton.visibility = View.GONE
+
+        val showAllButtons = findViewById<Button>(R.id.showAllButtons)
+        showAllButtons.visibility = View.GONE
+
+        val destinationInput: EditText = findViewById(R.id.destinationInput)
+        val destinationButton: Button = findViewById(R.id.destinationButton)
+        val createRouteButton: Button = findViewById(R.id.createRouteButton)
+        val startNavigationButton: Button = findViewById(R.id.startNavigationButton)
+        val routeDetails: TextView = findViewById(R.id.routeDetails)
+        val talkToPush: Button = findViewById(R.id.talkToPush)
+        val stopNavigationButton: Button = findViewById(R.id.stopNavigationButton)
+
+        destinationInput.visibility = View.VISIBLE
+        destinationButton.visibility = View.VISIBLE
+        createRouteButton.visibility = View.VISIBLE
+        startNavigationButton.visibility = View.VISIBLE
+        routeDetails.visibility = View.VISIBLE
+        talkToPush.visibility = View.VISIBLE
+        stopNavigationButton.visibility = View.VISIBLE
+    }
     private fun maximizeVolume() { //Ses fulleyen kod
         // AudioManager'ı al
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
