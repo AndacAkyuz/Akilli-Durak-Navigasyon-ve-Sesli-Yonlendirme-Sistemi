@@ -171,6 +171,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         talkToPush.visibility = View.VISIBLE
         stopNavigationButton.visibility = View.VISIBLE
     }
+
     private fun maximizeVolume() { //Ses fulleyen kod
         // AudioManager'ı al
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -206,7 +207,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
             if (spokenText.isNotEmpty()) {
                 destinationInput.setText(spokenText)
-                if (!isNavigating) {
+                if (!isNavigating && !isRouteDrawn) {
                     searchAndNavigate(spokenText)
                 }
             } else {
@@ -237,7 +238,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                         searchMarker?.remove()
                         searchMarker = mMap.addMarker(MarkerOptions().position(it).title(address))
                         currentLocation?.let { origin ->
-                            drawRouteAndStartNavigation(origin, it)
+                            drawRoute(origin, it, "transit")
                         }
                     }
                 }
@@ -245,24 +246,31 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
 
-    private fun drawRouteAndStartNavigation(origin: LatLng, destination: LatLng) {
-        if (isNavigating) return
+    private var isDrawingRoute = false // Flag to check if route is being drawn
 
-        val url = getDirectionsUrl(origin, destination, "transit")
+    private fun drawRoute(origin: LatLng, destination: LatLng, mode: String) {
+        if (isDrawingRoute || isRouteDrawn) return
+
+        isDrawingRoute = true
+        val url = getDirectionsUrl(origin, destination, mode)
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val result = URL(url).readText()
                 withContext(Dispatchers.Main) {
+                    // Çift rotayı önlemek için önceki rotayı temizleyin
+                    routePolyline?.remove()
                     parseDirections(result)
+                    isRouteDrawn = true
                     if (!isNavigating) {
                         startNavigation()
-                        isRouteDrawn = true
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@MapsActivity, "Error in drawing route: ${e.message}", Toast.LENGTH_LONG).show()
                 }
+            } finally {
+                isDrawingRoute = false
             }
         }
     }
@@ -310,25 +318,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }.addOnFailureListener { exception ->
             Toast.makeText(this, "Error finding place: ${exception.message}", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    private fun drawRoute(origin: LatLng, dest: LatLng, mode: String) {
-        if (isRouteDrawn) return
-
-        val url = getDirectionsUrl(origin, dest, mode)
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val result = URL(url).readText()
-                withContext(Dispatchers.Main) {
-                    parseDirections(result)
-                    isRouteDrawn = true
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@MapsActivity, "Error in drawing route: ${e.message}", Toast.LENGTH_LONG).show()
-                }
-            }
         }
     }
 
@@ -397,34 +386,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private var navigationHandler: Handler? = null // Global Handler reference for navigation  , Stop işlemi için gerekli
-
-//    private fun navigatePath(path: List<LatLng>, index: Int) { // Navigasyon oluşturma ve başlatma ESKİ FONKSİYON ARTIK KULLANILMIYOR
-//        navigationHandler = Handler(Looper.getMainLooper())
-//
-//        if (index < path.size) {
-//            val currentPoint = path[index]
-//            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentPoint, 17f))
-//
-//            if (index < path.size - 1) {
-//                val nextPoint = path[index + 1]
-//                val direction = calculateDirection(currentPoint, nextPoint)
-//                val distance = SphericalUtil.computeDistanceBetween(currentPoint, nextPoint)
-//                val stepsToNext = (distance / averageStepLength).toInt()
-//                val detailedDirection = "$stepsToNext adım sonra $direction yönüne gidin."
-//                Toast.makeText(this, detailedDirection, Toast.LENGTH_LONG).show()
-//                tts.speak(detailedDirection, TextToSpeech.QUEUE_ADD, null, null)
-//            }
-//
-//            // Schedule the next update
-//            navigationHandler?.postDelayed({
-//                navigatePath(path, index + 1) // Recursive call to move to the next point
-//            }, 8000) // Adjust the delay time as needed for your app context
-//        } else {
-//            // Navigation has reached the end
-//            Toast.makeText(this, "Navigasyon tamamlandı.", Toast.LENGTH_LONG).show()
-//            tts.speak("Navigasyon tamamlandı.", TextToSpeech.QUEUE_FLUSH, null, null)
-//        }
-//    }
 
     fun stopNavigation(view: View?) {
         isNavigating = false
@@ -506,6 +467,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         fusedLocationClient.removeLocationUpdates(locationCallback)
     }
 
+    private var lastSpokenTime: Long = 0 // Son konuşma zamanını tutar
     private fun updateNavigation(location: Location) {
         currentLocation = LatLng(location.latitude, location.longitude)
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(currentLocation!!, 17f))
@@ -519,8 +481,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                     val distance = SphericalUtil.computeDistanceBetween(currentLocation!!, nextPoint)
                     val stepsToNext = (distance / averageStepLength).toInt()
                     val detailedDirection = "$stepsToNext adım sonra $direction yönüne gidin."
-                    Toast.makeText(this, detailedDirection, Toast.LENGTH_LONG).show()
-                    tts.speak(detailedDirection, TextToSpeech.QUEUE_ADD, null, null)
+
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastSpokenTime > 10000) { // 10 saniye gecikme
+                        Toast.makeText(this, detailedDirection, Toast.LENGTH_LONG).show()
+                        tts.speak(detailedDirection, TextToSpeech.QUEUE_FLUSH, null, null)
+                        lastSpokenTime = currentTime
+                    }
                 }
             }
         }
