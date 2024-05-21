@@ -11,6 +11,7 @@ Bu proje, görme engelli bireyler için bağımsız hareket etmelerini kolaylaş
 - **Engel Tespiti ve Bilgilendirme**: Yolda karşılaşılan engeller hakkında kullanıcıyı bilgilendirir.
 - **Rota Planlama**: Kullanıcıların belirli bir noktaya ulaşmaları için en uygun rotayı belirler.
 - **Durak Bilgilendirme**: Toplu taşıma durakları hakkında bilgi sağlar.
+- **İşlevsellik ve Erişilebilirlik**: Kolay tuş atamaları ve otomatik ses açma özelliği.
 
 ## Kurulum
 
